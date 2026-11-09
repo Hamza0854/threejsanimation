@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Car Interior 360° Viewer</title>
+  <title>Hotel Virtual Tour</title>
 
-  <!-- Bootstrap 5 -->
+  <!-- Bootstrap 5 + Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
@@ -14,110 +14,121 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/markers-plugin/index.min.css">
 
   <style>
-    :root {
-      --accent: #c8a45c;        /* <-- main brand colour (gold) */
-      --dark: #0e0f12;
-    }
+    :root { --accent: #c8a45c; --dark: #0d0e11; }
     body { background: var(--dark); color: #fff; font-family: "Segoe UI", system-ui, sans-serif; }
 
-    /* ---------- Section title ---------- */
-    .section-title { letter-spacing: .25em; text-transform: uppercase; font-weight: 300; }
-    .section-title span { color: var(--accent); font-weight: 600; }
+    .brand { letter-spacing: .3em; text-transform: uppercase; font-weight: 300; }
+    .brand span { color: var(--accent); font-weight: 600; }
 
-    /* ---------- Viewer box ---------- */
-    .viewer-wrap { position: relative; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
-    #viewer { width: 100%; height: 78vh; min-height: 420px; }
+    .tour-wrap { position: relative; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); background: #000; }
+    #viewer { width: 100%; height: 80vh; min-height: 460px; }
 
-    /* ---------- Scene tabs (top-left) ---------- */
-    .scene-tabs { position: absolute; top: 18px; left: 18px; z-index: 10; }
-    .scene-tabs .btn { background: rgba(0,0,0,.55); color: #fff; border: 1px solid rgba(255,255,255,.2);
-                       backdrop-filter: blur(6px); font-size: .85rem; }
-    .scene-tabs .btn.active { background: var(--accent); border-color: var(--accent); color: #111; }
+    /* Loading / error overlay */
+    .tour-overlay { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center;
+                    justify-content: center; background: #0d0e11; transition: opacity .6s; text-align: center; padding: 20px; }
+    .tour-overlay.hide { opacity: 0; pointer-events: none; }
+    .tour-overlay .spinner-border { color: var(--accent); width: 3rem; height: 3rem; }
 
-    /* ---------- Tool buttons (top-right) ---------- */
+    /* Room name badge */
+    .room-badge { position: absolute; top: 18px; left: 18px; z-index: 10; background: rgba(0,0,0,.55);
+                  backdrop-filter: blur(8px); padding: 10px 18px; border-radius: 12px; border-left: 3px solid var(--accent); }
+    .room-badge small { opacity: .7; display: block; font-size: .75rem; letter-spacing: .15em; text-transform: uppercase; }
+    .room-badge strong { font-size: 1.15rem; }
+
+    /* Tools */
     .tool-bar { position: absolute; top: 18px; right: 18px; z-index: 10; display: flex; gap: 8px; }
     .tool-bar .btn { width: 42px; height: 42px; border-radius: 50%; padding: 0; background: rgba(0,0,0,.55);
                      color: #fff; border: 1px solid rgba(255,255,255,.2); backdrop-filter: blur(6px); }
     .tool-bar .btn.active, .tool-bar .btn:hover { background: var(--accent); color: #111; }
 
-    /* ---------- Trim colour picker (bottom-left) ---------- */
-    .trim-picker { position: absolute; bottom: 60px; left: 18px; z-index: 10; background: rgba(0,0,0,.55);
-                   backdrop-filter: blur(6px); padding: 10px 14px; border-radius: 40px; display: flex; align-items: center; gap: 10px; }
-    .trim-picker small { opacity: .8; }
-    .trim-dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); cursor: pointer; transition: .2s; }
-    .trim-dot.active { border-color: var(--accent); transform: scale(1.2); }
+    /* Room thumbnails strip */
+    .room-strip { position: absolute; left: 50%; bottom: 56px; transform: translateX(-50%); z-index: 10;
+                  display: flex; gap: 10px; padding: 8px; background: rgba(0,0,0,.5); backdrop-filter: blur(8px);
+                  border-radius: 14px; max-width: calc(100% - 36px); overflow-x: auto; }
+    .room-thumb { width: 120px; height: 70px; flex: 0 0 auto; border-radius: 10px; border: 2px solid transparent;
+                  background: #222 center/cover no-repeat; position: relative; cursor: pointer; transition: .25s; }
+    .room-thumb span { position: absolute; inset: auto 0 0 0; font-size: .75rem; padding: 3px 6px;
+                       background: linear-gradient(transparent, rgba(0,0,0,.85)); border-radius: 0 0 8px 8px; }
+    .room-thumb:hover { transform: translateY(-3px); }
+    .room-thumb.active { border-color: var(--accent); }
 
-    /* ---------- Hotspot style ---------- */
-    .hotspot { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,.95);
-               border: 3px solid var(--accent); display: flex; align-items: center; justify-content: center;
-               color: #111; font-size: 14px; cursor: pointer; animation: pulse 2s infinite; }
-    @keyframes pulse {
-      0%   { box-shadow: 0 0 0 0 rgba(200,164,92,.7); }
-      70%  { box-shadow: 0 0 0 16px rgba(200,164,92,0); }
-      100% { box-shadow: 0 0 0 0 rgba(200,164,92,0); }
-    }
+    /* Info hotspot */
+    .hs-info { width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 3px solid var(--accent);
+               display: flex; align-items: center; justify-content: center; color: #111; font-size: 14px;
+               cursor: pointer; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(200,164,92,.7); } 70% { box-shadow: 0 0 0 16px rgba(200,164,92,0); } 100% { box-shadow: 0 0 0 0 rgba(200,164,92,0); } }
 
-    /* ---------- Info card (right side) ---------- */
-    .info-card { position: absolute; right: 18px; bottom: 60px; width: 320px; max-width: calc(100% - 36px); z-index: 11;
-                 background: rgba(14,15,18,.88); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12);
-                 border-radius: 14px; color: #fff; transform: translateY(20px); opacity: 0; pointer-events: none; transition: .35s; }
+    /* Navigation (go to room) hotspot */
+    .hs-link { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+    .hs-link .arrow { width: 54px; height: 54px; border-radius: 50%; background: rgba(0,0,0,.55); border: 2px solid #fff;
+                      display: flex; align-items: center; justify-content: center; font-size: 24px; color: #fff;
+                      backdrop-filter: blur(4px); transition: .25s; }
+    .hs-link:hover .arrow { background: var(--accent); color: #111; transform: scale(1.12); }
+    .hs-link .label { margin-top: 6px; background: rgba(0,0,0,.7); padding: 3px 10px; border-radius: 20px;
+                      font-size: 12px; white-space: nowrap; color: #fff; }
+
+    /* Info card */
+    .info-card { position: absolute; right: 18px; top: 74px; width: 320px; max-width: calc(100% - 36px); z-index: 11;
+                 background: rgba(13,14,17,.9); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12);
+                 border-radius: 14px; color: #fff; transform: translateX(30px); opacity: 0; pointer-events: none; transition: .35s; }
     .info-card.show { transform: none; opacity: 1; pointer-events: auto; }
-    .info-card img { border-radius: 14px 14px 0 0; height: 150px; object-fit: cover; }
     .info-card h5 { color: var(--accent); }
+    .info-card img { border-radius: 14px 14px 0 0; height: 150px; object-fit: cover; }
 
-    /* ---------- Hint + dev toast ---------- */
-    .drag-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 9; pointer-events: none;
-                 background: rgba(0,0,0,.55); padding: 10px 20px; border-radius: 30px; transition: opacity .6s; }
-    .dev-toast { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); z-index: 12;
+    .dev-toast { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); z-index: 12;
                  background: #198754; padding: 8px 16px; border-radius: 8px; font-family: monospace; display: none; }
 
     @media (max-width: 576px) {
-      #viewer { height: 70vh; }
-      .scene-tabs .btn { font-size: .75rem; padding: 4px 8px; }
-      .info-card { bottom: 110px; }
+      #viewer { height: 75vh; }
+      .room-thumb { width: 90px; height: 56px; }
+      .room-badge strong { font-size: 1rem; }
     }
   </style>
 </head>
 <body>
 
-<section class="container-fluid py-5 px-lg-5">
-  <div class="text-center mb-4">
-    <h2 class="section-title">Explore the <span>Interior</span></h2>
-    <p class="text-secondary mb-0">Drag to look around · Scroll or pinch to zoom · Tap the dots to discover features</p>
-  </div>
+<nav class="navbar px-4 py-3">
+  <span class="brand fs-5">Grand <span>Haven</span> Hotel</span>
+  <a href="#" class="btn btn-sm px-4" style="background:var(--accent);color:#111;">Book Now</a>
+</nav>
 
-  <div class="viewer-wrap">
+<section class="container-fluid pb-5 px-lg-5">
+  <p class="text-center text-secondary mb-3">
+    Drag to look around · Click the arrows to walk between rooms · Tap the dots for details
+  </p>
+
+  <div class="tour-wrap">
     <div id="viewer"></div>
 
-    <!-- Scene buttons (filled by JS from CONFIG) -->
-    <div class="scene-tabs btn-group" id="sceneTabs"></div>
+    <!-- Loading / error screen -->
+    <div class="tour-overlay" id="overlay">
+      <div class="spinner-border mb-3" role="status"></div>
+      <p class="mb-0" id="overlayText">Loading virtual tour…</p>
+    </div>
 
-    <!-- Tools -->
+    <div class="room-badge"><small id="roomFloor"></small><strong id="roomName"></strong></div>
+
     <div class="tool-bar">
       <button class="btn" id="btnRotate" title="Auto rotate"><i class="bi bi-arrow-repeat"></i></button>
       <button class="btn" id="btnReset"  title="Reset view"><i class="bi bi-bullseye"></i></button>
       <button class="btn" id="btnFull"   title="Fullscreen"><i class="bi bi-arrows-fullscreen"></i></button>
     </div>
 
-    <!-- Trim colours (filled by JS) -->
-    <div class="trim-picker" id="trimPicker"><small>Trim</small></div>
+    <div class="room-strip" id="roomStrip"></div>
 
-    <!-- Feature info card -->
     <div class="card info-card" id="infoCard">
       <img id="infoImg" class="card-img-top d-none" alt="">
       <div class="card-body">
         <button type="button" class="btn-close btn-close-white float-end" id="infoClose"></button>
-        <h5 class="card-title" id="infoTitle"></h5>
-        <p class="card-text small mb-0" id="infoText"></p>
+        <h5 id="infoTitle"></h5>
+        <p class="small mb-0" id="infoText"></p>
       </div>
     </div>
 
-    <div class="drag-hint" id="dragHint"><i class="bi bi-hand-index me-2"></i>Drag to explore</div>
     <div class="dev-toast" id="devToast"></div>
   </div>
 </section>
 
-<!-- Three.js + Photo Sphere Viewer as ES modules -->
 <script type="importmap">
 {
   "imports": {
@@ -135,205 +146,261 @@ import { MarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
 import { AutorotatePlugin } from '@photo-sphere-viewer/autorotate-plugin';
 
 /* =====================================================================
-   ⚙️  CONFIG — EVERYTHING YOU CUSTOMIZE IS HERE
+   ⚙️  CONFIG — EDIT ROOMS, IMAGES AND HOTSPOTS HERE
+   ---------------------------------------------------------------------
+   image    : your local file (recommended, 4096×2048 JPG, 2–3 MB)
+   fallback : online backup used automatically if "image" can't be loaded
+              (Poly Haven 8K files are very large, so they load slowly)
    ===================================================================== */
-const DEMO = 'nam-cz-zjPyfetYcOQ-unsplash.jpg'; // demo image only — replace!
+const PH = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/';
+const TH = 'https://cdn.polyhaven.com/asset_img/thumbs/';
 
 const CONFIG = {
-  devMode: true,               // true = click in viewer to get hotspot coordinates. Set false for live site.
-  autoRotate: false,            // start rotating automatically
-  rotateSpeed: '0.6rpm',       // rotation speed
-  introAnimation: true,        // zoom-in when page loads
-  transitionMs: 1200,          // fade time between scenes / trims
+  devMode: true,          // click in the viewer to get yaw/pitch for hotspots. false for live site.
+  autoRotate: false,
+  rotateSpeed: '0.5rpm',
+  transitionMs: 1200,
+  startRoom: 'lobby',
 
-  // Trim colours. "key" must match the keys used in each scene's "images".
-  trims: [
-    { key: 'black', label: 'Midnight Black', color: '#1b1b1b' },
-    { key: 'brown', label: 'Saddle Brown',   color: '#7a4a2a' },
-  ],
-
-  // Camera positions inside the car
-  scenes: [
+  rooms: [
     {
-      id: 'front',
-      label: 'Front Cabin',
-      images: { black: DEMO, brown: DEMO },      // e.g. 'images/front-black.jpg'
-      start: { yaw: '0deg', pitch: '-5deg', zoom: 40 },
+      id: 'lobby',
+      name: 'Grand Lobby',
+      floor: 'Ground Floor',
+      image: 'entrance_hall.jpg',
+      fallback: PH + 'vestibule.jpg',
+      thumb: TH + 'vestibule.png?width=240',
+      start: { yaw: '0deg', pitch: '0deg', zoom: 30 },
       hotspots: [
-        { id: 'screen', yaw: '0deg',   pitch: '-10deg', icon: 'bi-display',
-          title: '15.6-inch Touchscreen',
-          text: 'Central touchscreen with Apple CarPlay and Android Auto support.',
-          image: '' },                               // optional photo for the card
-        { id: 'heated', yaw: '-40deg', pitch: '-25deg', icon: 'bi-thermometer-sun',
-          title: 'Heated & Ventilated Seats',
-          text: 'Front seats warm you up in winter and keep you cool in summer.' },
-        { id: 'roof',   yaw: '20deg',  pitch: '55deg',  icon: 'bi-brightness-high',
-          title: 'Panoramic Sunroof',
-          text: 'Brings natural light into the whole cabin.' },
+        { type: 'info', yaw: '20deg', pitch: '-10deg', icon: 'bi-bell',
+          title: '24/7 Reception', text: 'Our concierge team welcomes you day and night.' },
+        { type: 'link', goTo: 'lounge', yaw: '-60deg', pitch: '-15deg', label: 'Lounge' },
+        { type: 'link', goTo: 'room',   yaw: '120deg', pitch: '-15deg', label: 'Deluxe Room' },
       ],
     },
     {
-      id: 'rear',
-      label: 'Rear Seats',
-      images: { black: DEMO, brown: DEMO },
-      start: { yaw: '180deg', pitch: '0deg', zoom: 40 },
+      id: 'lounge',
+      name: 'Lounge',
+      floor: 'Ground Floor',
+      image: 'anniversary_lounge.jpg',
+      fallback: PH + 'lythwood_lounge.jpg',
+      thumb: TH + 'lythwood_lounge.png?width=240',
+      start: { yaw: '0deg', pitch: '0deg', zoom: 30 },
       hotspots: [
-        { id: 'space', yaw: '170deg', pitch: '-15deg', icon: 'bi-people',
-          title: 'Spacious Passenger Area',
-          text: 'Generous lateral room for rear passengers.' },
+        { type: 'info', yaw: '40deg', pitch: '-15deg', icon: 'bi-cup-hot',
+          title: 'Coffee & Lounge Bar', text: 'Relax with freshly brewed coffee and light snacks.' },
+        { type: 'link', goTo: 'lobby', yaw: '180deg', pitch: '-15deg', label: 'Back to Lobby' },
+        { type: 'link', goTo: 'suite', yaw: '90deg',  pitch: '-15deg', label: 'Suite' },
       ],
     },
     {
-      id: 'trunk',
-      label: 'Trunk',
-      images: { black: DEMO, brown: DEMO },
-      start: { yaw: '90deg', pitch: '-20deg', zoom: 30 },
+      id: 'room',
+      name: 'Deluxe Room',
+      floor: 'Floor 3',
+      image: 'lythwood_room.jpg',
+      fallback: PH + 'hotel_room.jpg',
+      thumb: TH + 'hotel_room.png?width=240',
+      start: { yaw: '0deg', pitch: '-5deg', zoom: 30 },
       hotspots: [
-        { id: 'cargo', yaw: '90deg', pitch: '-30deg', icon: 'bi-box-seam',
-          title: 'Flexible Cargo Space',
-          text: 'Fold the second row for a much longer load floor.' },
+        { type: 'info', yaw: '0deg', pitch: '-20deg', icon: 'bi-moon-stars',
+          title: 'King-Size Bed', text: 'Premium mattress and soft cotton linen.' },
+        { type: 'info', yaw: '-70deg', pitch: '0deg', icon: 'bi-wifi',
+          title: 'Free High-Speed Wi-Fi', text: 'Stream, work and call without limits.' },
+        { type: 'link', goTo: 'lobby', yaw: '180deg', pitch: '-15deg', label: 'Lobby' },
+        { type: 'link', goTo: 'suite', yaw: '100deg', pitch: '-15deg', label: 'Suite' },
+      ],
+    },
+    {
+      id: 'suite',
+      name: 'Private Suite',
+      floor: 'Top Floor',
+      image: 'en_suite.jpg',
+      fallback: PH + 'solitude_interior.jpg',
+      thumb: TH + 'solitude_interior.png?width=240',
+      start: { yaw: '0deg', pitch: '0deg', zoom: 30 },
+      hotspots: [
+        { type: 'info', yaw: '30deg', pitch: '5deg', icon: 'bi-brightness-high',
+          title: 'Panoramic Windows', text: 'Wake up to natural light and open views.' },
+        { type: 'link', goTo: 'room',   yaw: '180deg', pitch: '-15deg', label: 'Deluxe Room' },
+        { type: 'link', goTo: 'lounge', yaw: '-90deg', pitch: '-15deg', label: 'Lounge' },
       ],
     },
   ],
 };
 /* ===================== END OF CONFIG ===================== */
 
+const roomsById = Object.fromEntries(CONFIG.rooms.map(r => [r.id, r]));
+let current = roomsById[CONFIG.startRoom];
+let busy = false;
 
-let currentScene = CONFIG.scenes[0];
-let currentTrim  = CONFIG.trims[0].key;
+/* ---------- Overlay helpers ---------- */
+const overlay = document.getElementById('overlay');
+const overlayText = document.getElementById('overlayText');
+function showOverlay(msg) { overlayText.innerHTML = msg; overlay.classList.remove('hide'); }
+function hideOverlay() { overlay.classList.add('hide'); }
 
-// ---------- Create viewer ----------
+/* ---------- Check which image actually loads (local first, then fallback) ---------- */
+function canLoad(url) {
+  return new Promise(resolve => {
+    if (!url) return resolve(false);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload  = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+}
+const resolved = {}; // cache: room id -> working url
+async function getImage(room) {
+  if (resolved[room.id]) return resolved[room.id];
+  if (await canLoad(room.image)) return (resolved[room.id] = room.image);
+  console.warn(`⚠️ "${room.image}" could not be loaded (check file name / folder). Using online fallback for "${room.name}".`);
+  if (await canLoad(room.fallback)) return (resolved[room.id] = room.fallback);
+  console.error(`❌ No image could be loaded for "${room.name}".`);
+  return null;
+}
+
+/* ---------- Start: find first working image, then create viewer ---------- */
+const firstUrl = await getImage(current);
+if (!firstUrl) {
+  document.querySelector('#overlay .spinner-border').remove();
+  showOverlay(`<i class="bi bi-exclamation-triangle fs-1 text-warning d-block mb-2"></i>
+    Could not load <b>${current.image}</b>.<br>
+    Check that the file exists in the <code>images</code> folder and the name is correct
+    (watch out for <code>lobby.jpg.jpg</code>).`);
+  throw new Error('No panorama available');
+}
+
 const viewer = new Viewer({
   container: document.getElementById('viewer'),
-  panorama: currentScene.images[currentTrim],
-  defaultYaw: currentScene.start.yaw,
-  defaultPitch: currentScene.start.pitch,
-  defaultZoomLvl: CONFIG.introAnimation ? 0 : currentScene.start.zoom,
+  panorama: firstUrl,
+  defaultYaw: current.start.yaw,
+  defaultPitch: current.start.pitch,
+  defaultZoomLvl: 0,
   navbar: ['zoom', 'caption'],
-  caption: currentScene.label,
+  caption: current.name,
   touchmoveTwoFingers: false,
   mousewheelCtrlKey: false,
-  loadingTxt: 'Loading interior…',
+  loadingTxt: 'Loading room…',
   plugins: [
     [MarkersPlugin, { markers: [] }],
     [AutorotatePlugin, {
-      autostartDelay: CONFIG.autoRotate ? 2500 : null,
+      autostartDelay: CONFIG.autoRotate ? 3000 : null,
       autostartOnIdle: CONFIG.autoRotate,
       autorotateSpeed: CONFIG.rotateSpeed,
       autorotatePitch: '0deg',
     }],
   ],
 });
-
 const markers = viewer.getPlugin(MarkersPlugin);
 const rotator = viewer.getPlugin(AutorotatePlugin);
 
-// ---------- Hotspots ----------
-function toMarker(h) {
+/* ---------- Hotspots ---------- */
+function toMarker(h, i) {
+  const isLink = h.type === 'link';
   return {
-    id: h.id,
+    id: `${current.id}-${i}`,
     position: { yaw: h.yaw, pitch: h.pitch },
-    html: `<div class="hotspot"><i class="bi ${h.icon || 'bi-plus-lg'}"></i></div>`,
-    size: { width: 30, height: 30 },
-    anchor: 'center center',
-    tooltip: { content: h.title, position: 'top center' },
+    html: isLink
+      ? `<div class="hs-link"><div class="arrow"><i class="bi bi-arrow-up"></i></div><div class="label">${h.label}</div></div>`
+      : `<div class="hs-info"><i class="bi ${h.icon || 'bi-info-lg'}"></i></div>`,
+    size: isLink ? { width: 54, height: 80 } : { width: 30, height: 30 },
+    anchor: isLink ? 'center top' : 'center center',
+    tooltip: isLink ? null : { content: h.title, position: 'top center' },
     data: h,
   };
 }
-function loadHotspots() {
-  markers.setMarkers(currentScene.hotspots.map(toMarker));
-}
+const loadHotspots = () => markers.setMarkers(current.hotspots.map(toMarker));
 
 markers.addEventListener('select-marker', ({ marker }) => {
   rotator.stop();
-  markers.gotoMarker(marker.id, '4rpm');
-  showInfo(marker.data);
+  const h = marker.data;
+  if (h.type === 'link') {
+    walkTo(h);
+  } else {
+    markers.gotoMarker(marker.id, '4rpm');
+    showInfo(h);
+  }
 });
 
-// ---------- Info card ----------
+/* ---------- Walk to another room (look + zoom, then fade) ---------- */
+function walkTo(link) {
+  if (busy) return;
+  viewer.animate({ yaw: link.yaw, pitch: '0deg', zoom: 70, speed: '8rpm' })
+    .then(() => goToRoom(link.goTo));
+}
+
+async function goToRoom(id) {
+  const room = roomsById[id];
+  if (!room || room === current || busy) return;
+  busy = true;
+  card.classList.remove('show');
+
+  const url = await getImage(room);
+  if (!url) { busy = false; alert(`The image for "${room.name}" could not be loaded.`); return; }
+
+  current = room;
+  markers.clearMarkers();
+  updateUI();
+  try {
+    await viewer.setPanorama(url, {
+      transition: CONFIG.transitionMs,
+      position: { yaw: room.start.yaw, pitch: room.start.pitch },
+      zoom: room.start.zoom,
+      caption: room.name,
+    });
+    loadHotspots();
+  } catch (e) {
+    console.error('Panorama error:', e);
+  }
+  busy = false;
+}
+
+/* ---------- Room strip + badge ---------- */
+const strip = document.getElementById('roomStrip');
+CONFIG.rooms.forEach(r => {
+  const t = document.createElement('div');
+  t.className = 'room-thumb';
+  t.dataset.id = r.id;
+  t.style.backgroundImage = `url('${r.thumb || r.image}')`;
+  t.innerHTML = `<span>${r.name}</span>`;
+  t.onclick = () => { rotator.stop(); goToRoom(r.id); };
+  strip.appendChild(t);
+});
+function updateUI() {
+  document.getElementById('roomName').textContent  = current.name;
+  document.getElementById('roomFloor').textContent = current.floor || '';
+  strip.querySelectorAll('.room-thumb').forEach(t => t.classList.toggle('active', t.dataset.id === current.id));
+}
+updateUI();
+
+/* ---------- Info card ---------- */
 const card = document.getElementById('infoCard');
 function showInfo(h) {
   document.getElementById('infoTitle').textContent = h.title;
-  document.getElementById('infoText').textContent  = h.text;
+  document.getElementById('infoText').textContent  = h.text || '';
   const img = document.getElementById('infoImg');
-  if (h.image) { img.src = h.image; img.classList.remove('d-none'); } else { img.classList.add('d-none'); }
+  if (h.image) { img.src = h.image; img.classList.remove('d-none'); } else img.classList.add('d-none');
   card.classList.add('show');
 }
 document.getElementById('infoClose').onclick = () => card.classList.remove('show');
 
-// ---------- Scene switching ----------
-const tabs = document.getElementById('sceneTabs');
-CONFIG.scenes.forEach((s, i) => {
-  const b = document.createElement('button');
-  b.className = 'btn' + (i === 0 ? ' active' : '');
-  b.textContent = s.label;
-  b.onclick = () => goToScene(s, b);
-  tabs.appendChild(b);
-});
-
-function goToScene(scene, btn) {
-  if (scene === currentScene) return;
-  currentScene = scene;
-  tabs.querySelectorAll('.btn').forEach(x => x.classList.remove('active'));
-  btn.classList.add('active');
-  card.classList.remove('show');
-  markers.clearMarkers();
-  viewer.setPanorama(scene.images[currentTrim], {
-    transition: CONFIG.transitionMs,
-    position: { yaw: scene.start.yaw, pitch: scene.start.pitch },
-    zoom: scene.start.zoom,
-    caption: scene.label,
-  }).then(loadHotspots);
-}
-
-// ---------- Trim switching ----------
-const picker = document.getElementById('trimPicker');
-CONFIG.trims.forEach((t, i) => {
-  const d = document.createElement('div');
-  d.className = 'trim-dot' + (i === 0 ? ' active' : '');
-  d.style.background = t.color;
-  d.title = t.label;
-  d.onclick = () => {
-    if (t.key === currentTrim) return;
-    currentTrim = t.key;
-    picker.querySelectorAll('.trim-dot').forEach(x => x.classList.remove('active'));
-    d.classList.add('active');
-    // keep the same camera angle while changing colour
-    viewer.setPanorama(currentScene.images[currentTrim], {
-      transition: CONFIG.transitionMs,
-      position: viewer.getPosition(),
-      zoom: viewer.getZoomLevel(),
-    });
-  };
-  picker.appendChild(d);
-});
-
-// ---------- Tools ----------
+/* ---------- Tools ---------- */
 const btnRotate = document.getElementById('btnRotate');
 btnRotate.onclick = () => rotator.toggle();
-rotator.addEventListener('autorotate', ({ autorotateEnabled }) =>
-  btnRotate.classList.toggle('active', autorotateEnabled));
-
-document.getElementById('btnReset').onclick = () => viewer.animate({
-  yaw: currentScene.start.yaw, pitch: currentScene.start.pitch,
-  zoom: currentScene.start.zoom, speed: '3rpm',
-});
+rotator.addEventListener('autorotate', ({ autorotateEnabled }) => btnRotate.classList.toggle('active', autorotateEnabled));
+document.getElementById('btnReset').onclick = () =>
+  viewer.animate({ yaw: current.start.yaw, pitch: current.start.pitch, zoom: current.start.zoom, speed: '3rpm' });
 document.getElementById('btnFull').onclick = () => viewer.toggleFullscreen();
 
-// ---------- Intro + drag hint ----------
+/* ---------- Intro zoom ---------- */
 viewer.addEventListener('ready', () => {
+  hideOverlay();
   loadHotspots();
-  if (CONFIG.introAnimation) {
-    viewer.animate({ zoom: currentScene.start.zoom, yaw: currentScene.start.yaw,
-                     pitch: currentScene.start.pitch, speed: 2000 });
-  }
+  viewer.animate({ zoom: current.start.zoom, speed: 2000 });
 }, { once: true });
 
-const hint = document.getElementById('dragHint');
-viewer.addEventListener('position-updated', () => { hint.style.opacity = 0; }, { once: true });
-setTimeout(() => hint.style.opacity = 0, 5000);
-
-// ---------- Dev mode: click to get hotspot coordinates ----------
+/* ---------- Dev mode: click to get coordinates ---------- */
 if (CONFIG.devMode) {
   const toast = document.getElementById('devToast');
   viewer.addEventListener('click', ({ data }) => {
@@ -343,7 +410,6 @@ if (CONFIG.devMode) {
     toast.textContent = txt + '  (copied)';
     toast.style.display = 'block';
     navigator.clipboard?.writeText(txt);
-    console.log(txt);
     clearTimeout(toast._t);
     toast._t = setTimeout(() => toast.style.display = 'none', 3500);
   });
